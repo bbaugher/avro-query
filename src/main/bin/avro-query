@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+# Get parent directory to reference different files in archive
+base_dir=$(dirname $0)/..
+
+# Which java to use
+if [ -z "$JAVA_HOME" ]; then
+  JAVA="java"
+else
+  JAVA="$JAVA_HOME/bin/java"
+fi
+
+# Log4j options
+if [ -z "$AVRO_QUERY_LOG4J_OPTIONS" ]; then
+  AVRO_QUERY_LOG4J_OPTIONS="-Dlog4j.configuration=file:$base_dir/config/log4j.properties"
+fi
+
+# Tool library directory
+if [ -z "$AVRO_QUERY_LIB_DIR" ]; then
+  AVRO_QUERY_LIB_DIR="$base_dir/lib"
+fi
+
+# Other Java options
+if [ -z "$AVRO_QUERY_JAVA_OPTIONS" ]; then
+  AVRO_QUERY_JAVA_OPTIONS=""
+fi
+
+# Add Hadoop native libraries (needed for snappy compression codec) if present
+AVRO_QUERY_JAVA_LIB_OPTIONS=""
+native_lib_dir=/opt/cloudera/parcels/CDH/lib/hadoop/lib/native
+if [ -d $native_lib_dir ]; then
+  AVRO_QUERY_JAVA_LIB_OPTIONS="-Djava.library.path=$native_lib_dir"
+fi
+
+# Add all of the tool's /lib to classpath, we need these libraries to have higher classloading precedence
+# than the Hadoop libraries potentially added below
+CLASSPATH=$CLASSPATH:$base_dir/lib/*
+
+# Add Hadoop java libraries and config to classpath, if present
+if [ $(which hadoop 2> /dev/null) ]; then
+  CLASSPATH=$CLASSPATH:$(hadoop classpath)
+fi
+
+# Run the command
+$JAVA $AVRO_QUERY_JAVA_OPTIONS $AVRO_QUERY_JAVA_LIB_OPTIONS $AVRO_QUERY_LOG4J_OPTIONS -Davro.query.lib.dir=$AVRO_QUERY_LIB_DIR -cp $CLASSPATH com.bb021949.query.cli.Main "$@"
